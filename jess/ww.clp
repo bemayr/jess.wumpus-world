@@ -269,24 +269,25 @@
 	(declare (variables ?a ?b))
 	(adj ?a ?b ?a2 ?b2)
 	(cave (x ?a2)(y ?b2)(has-wumpus ~FALSE)))
- 
+
 (defrule evaluate-stench
 	(task think) 
 	(cave (x ?x)(y ?y)(stench TRUE))
 	(adj ?x ?y ?x2 ?y2)
-	?f <- (cave (x ?x2)(y ?y2)(has-wumpus ~FALSE))
+	?f <- (cave (x ?x2)(y ?y2)(has-wumpus UNKNOWN))
 	=>
-	;check amount of neighbors of x,y that can hold a wumpus
-	;it it's one only, he has the wumpus for sure
-	;can also be done when agent is not on x,y, therefore use UNKOWN or MAYBE
-	(if (= 1 (count-query-results query-neighbors-that-possibly-or-for-sure-hold-wumpus ?x ?y)) then
-		(printout t "#With stench in (" ?x "," ?y "), the wumpus is in (" ?x2  "," ?y2 ") for sure." crlf)
-		(modify ?f (has-wumpus TRUE)(safe FALSE))
-	else
-		;only mark field as "maybe wumpus" if it is wumpus status is currently unknown
-		(if (= UNKNOWN (fact-slot-value ?f has-wumpus)) then
-			(printout t "#With stench in (" ?x "," ?y "), maybe the wumpus is in (" ?x2  "," ?y2 ")." crlf)
-			(modify ?f (has-wumpus MAYBE)))))
+	(printout t "With stench in (" ?x "," ?y "), maybe the wumpus is in (" ?x2  "," ?y2 ")." crlf)
+	(modify ?f (has-wumpus MAYBE)))
+
+(defrule evaluate-stench-wumpus-true
+	(task think) 
+	(cave (x ?x)(y ?y)(stench TRUE))
+	(adj ?x ?y ?x2 ?y2)
+	?f <- (cave (x ?x2)(y ?y2)(has-wumpus ~FALSE))
+    (test (= 1 (count-query-results query-neighbors-that-possibly-or-for-sure-hold-wumpus ?x ?y)))
+	=>
+    (printout t "#With stench in (" ?x "," ?y "), the wumpus is in (" ?x2  "," ?y2 ") for sure." crlf)
+	(modify ?f (has-wumpus TRUE)(safe FALSE)))
 
 (defrule evaluate-breeze-none
   (task think) 
@@ -360,55 +361,6 @@
   =>
   (printout t "(" ?x "," ?y ") is safe, so there's no pit or wumpus in it." crlf)
   (modify ?f (has-wumpus FALSE)(has-pit FALSE)))
-
-
-;; custom rules
-(defquery get-adjacent-stenching
-  "find all stenching adjacent fields"
-  (declare (variables ?x ?y))
-  (adj ?x ?y ?x' ?y') ;; cave is adjacent
-  (cave (x ?x') (y ?y') (stench TRUE))) ;; hunter knows about this cave and it stenches
-
-(deffunction is-wumpus-for-sure (?a ?b)
-  (bind ?count (count-query-results get-adjacent-stenching ?a ?b))
-  (printout t "-- Checking for Stenches around (" ?a "," ?b ")" crlf)
-  (printout t "-- Found: " ?count " (is > 1 = " (> ?count 1) ")" crlf)
-  (return (> ?count 1)))
-
-(defadvice before is-wumpus-for-sure
-    (printout t "'is-wumpus-for-sure' CALLED" crlf))
-
-(defrule can-deduce-wumpus
-  "can be sure that there is a wumpus because of surrounding stenching"
-  (task think)
-  ?cave <- (cave (x ?x)(y ?y)(has-wumpus MAYBE))
-  (test (is-wumpus-for-sure ?x ?y))
-  =>
-  (printout t "There MUST be a WUMPUS in (" ?x  "," ?y ")." crlf)
-  (modify ?cave (has-wumpus TRUE)))
-
-(defrule maybe-wumpus
-  "log maybe wumpus"
-  (task think)
-  ?cave <- (cave (x ?x)(y ?y)(has-wumpus MAYBE))
-  =>
-  (printout t "There MAYBE is a WUMPUS in (" ?x  "," ?y ")." crlf))
-
-;(defrule debug-can-deduce-wumpus
-;  (task think)
-;  ?cave <- (cave (x ?x)(y ?y)(has-wumpus MAYBE))
-;  =>
-;  (debug ?x ?y))
-
-(deffunction debug (?a ?b)
-  (bind ?result (run-query* get-adjacent-stenching ?a ?b))
-  (bind ?count (count-query-results get-adjacent-stenching ?a ?b))
-  (printout t "-- Checking for Stenches around (" ?a "," ?b ")" crlf)
-  (printout t "-- Found: " ?count " (is > 1 = " (> ?count 1) ")" crlf)
-  (while (?result next)
-    (printout t " " (?result get x') " " (?result getInt y') crlf)))
-
-
 
 ;; setting desires ...
 (defrule desire-to-leave-caves 
