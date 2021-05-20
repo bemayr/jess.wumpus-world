@@ -12,7 +12,9 @@
   (slot x (type INTEGER))
   (slot y (type INTEGER))
   (slot gold (default 0)(type INTEGER))
-  (slot alive (default TRUE)))
+  (slot alive (default TRUE))
+  (slot arrows (type INTEGER)(default 1))
+  (slot killed-wumpi (type INTEGER)(default 0)))
 
 (deftemplate desire "a hunter's desires"
   (slot agent)
@@ -329,13 +331,16 @@
 	"returns an iterator of neighboring caves of cave x,y that possibly or for sure hold a wumpus"
 	(declare (variables ?a ?b))
 	(adj ?a ?b ?a2 ?b2)
-	(cave (x ?a2)(y ?b2)(has-wumpus ~FALSE)))
+    (cave (x ?a2)(y ?b2)(has-wumpus ~FALSE)))
+;	(or (cave (x ?a2)(y ?b2)(has-wumpus MAYBE)))
+;	    (cave (x ?a2)(y ?b2)(has-wumpus UNKNOWN)))
 
 (defrule evaluate-stench-wumpus-sure
 	(task think) 
 	(cave (x ?x)(y ?y)(stench TRUE))
 	(adj ?x ?y ?x2 ?y2)
 	?f <- (cave (x ?x2)(y ?y2)(has-wumpus ~FALSE))
+    (wumpus (x ?x2)(y ?y2) (alive TRUE))
     (test (= 1 (count-query-results query-neighbors-that-possibly-or-for-sure-hold-wumpus ?x ?y)))
 	=>
     (printout t "#With stench in (" ?x "," ?y "), the wumpus is in (" ?x2  "," ?y2 ") for sure." crlf)
@@ -357,10 +362,18 @@
 	(printout t "#With breeze in (" ?x "," ?y "), the pit is in (" ?x2  "," ?y2 ") for sure." crlf)
 	(modify ?f (has-pit TRUE)(safe FALSE)))
 
+(defrule safe-cave4
+  (task think) 
+  ?f <- (cave (x ?x)(y ?y) (has-wumpus TRUE)(has-pit FALSE)(safe UNKNOWN))
+  (wumpus (x ?x)(y ?y)(alive FALSE))
+  =>
+  (printout t "With a dead wumpus and no pit, (" ?x "," ?y ") is safe." crlf)
+  (modify ?f (safe TRUE)))
+
 ;; setting desires ...
 (defrule desire-to-leave-caves 
   (task think)
-  (hunter (agent ?a)(x ?x)(y ?y)(gold ~0))
+  (hunter (agent ?a)(x ?x)(y ?y)(gold ~0)(killed-wumpi ~0))
   (cave (x ?x)(y ?y)(has-exit TRUE))
   => 
   (printout t "Having found the gold, " ?a " wants to leave the caves." crlf)
@@ -368,7 +381,7 @@
 
 (defrule add-desire-to-head-for-the-exit
   (task think) 
-  (hunter (agent ?agent) (x ?x)(y ?y)(gold ~0))
+  (hunter (agent ?agent) (x ?x)(y ?y)(gold ~0)(killed-wumpi ~0))
   (cave (x ?x)(y ?y)(fromx ?fx)(fromy ?fy))
   (test (> ?fx 0))
   =>  
@@ -431,6 +444,17 @@
  => 
  (printout t ?agent " somewhat wants to go to (" ?x2 "," ?y2 ")." crlf)
  (assert (desire (agent ?agent) (strength ?*verylow*) (action go)(x ?x2)(y  ?y2))))
+
+;; --- custom rules ---
+(defrule lust-for-kill
+  "if the hunter is next to a field where a wumpus lives, she wants to kill"
+  (task think)
+  (cave (x ?x)(y ?y)(has-wumpus TRUE))
+  (hunter (agent ?a)(x ?x2)(y ?y2))
+  (adj ?x ?y ?x2 ?y2)
+  =>
+  (printout t "#" ?a " wants to shoot the wumpus in (" ?x "," ?y ")." crlf)
+  (assert (desire (agent ?a)(strength ?*veryhigh*)(action shoot))))
 
 ;; PLAN rules  --------------------------------------------------------------
 ;; Planning our action is just simply picking the desire to realize
@@ -533,6 +557,22 @@
   =>
   (printout t "WARNING: unsatisfied goal: " ?act " " ?x " " ?y "."  crlf)
   (halt))
+
+;; --- custom rules ---
+(defrule kill-wumpus
+	"if there is a cave x,y with an wumpus on it an a adjacent cave x2,y2 with the hunter on it, the hunter kills the wumpus"
+	(task act)
+	?goal <- (goal (action shoot))
+    ?hunter <- (hunter (agent ?agent) (x ?x)(y ?y) (arrows ?arrows)(killed-wumpi ?killed-wumpi))
+    ?cave <- (cave (x ?x2)(y ?y2)(has-wumpus TRUE))
+    ?wumpus <- (wumpus (alive TRUE))
+    (test (> ?arrows 0))
+    =>
+    (printout t "#Hunter at (" ?x "," ?y ") kills wumpus at (" ?x2 "," ?y2 ")." crlf)
+    (retract ?goal)
+    (modify ?hunter (arrows (- ?arrows 1))(killed-wumpi (+ ?killed-wumpi 1)))
+	(modify ?cave (has-wumpus DEAD))
+	(modify ?wumpus (alive FALSE)))
 
 ;; TASK SWITCHING rules -------------------------------------------------------
 ;; These rules cycle us through the various tasks.  Note that they all
