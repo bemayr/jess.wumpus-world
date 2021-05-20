@@ -264,14 +264,29 @@
   (printout t "No stench in (" ?x "," ?y ") means no wumpus in (" ?x2 ","  ?y2 ")." crlf)
   (modify ?f (has-wumpus FALSE)))
 
+(defquery query-neighbors-that-possibly-or-for-sure-hold-wumpus
+	"returns an iterator of neighboring caves of cave x,y that possibly or for sure hold a wumpus"
+	(declare (variables ?a ?b))
+	(adj ?a ?b ?a2 ?b2)
+	(cave (x ?a2)(y ?b2)(has-wumpus ~FALSE)))
+ 
 (defrule evaluate-stench
-  (task think) 
-  (cave (x ?x)(y ?y)(stench TRUE))
-  (adj ?x ?y ?x2 ?y2)
-  ?f <- (cave (x ?x2)(y ?y2)(has-wumpus UNKNOWN))
-  =>
-  (printout t "With stench in (" ?x "," ?y "), maybe the wumpus is in (" ?x2  "," ?y2 ")." crlf)
-  (modify ?f (has-wumpus MAYBE)))
+	(task think) 
+	(cave (x ?x)(y ?y)(stench TRUE))
+	(adj ?x ?y ?x2 ?y2)
+	?f <- (cave (x ?x2)(y ?y2)(has-wumpus ~FALSE))
+	=>
+	;check amount of neighbors of x,y that can hold a wumpus
+	;it it's one only, he has the wumpus for sure
+	;can also be done when agent is not on x,y, therefore use UNKOWN or MAYBE
+	(if (= 1 (count-query-results query-neighbors-that-possibly-or-for-sure-hold-wumpus ?x ?y)) then
+		(printout t "#With stench in (" ?x "," ?y "), the wumpus is in (" ?x2  "," ?y2 ") for sure." crlf)
+		(modify ?f (has-wumpus TRUE)(safe FALSE))
+	else
+		;only mark field as "maybe wumpus" if it is wumpus status is currently unknown
+		(if (= UNKNOWN (fact-slot-value ?f has-wumpus)) then
+			(printout t "#With stench in (" ?x "," ?y "), maybe the wumpus is in (" ?x2  "," ?y2 ")." crlf)
+			(modify ?f (has-wumpus MAYBE)))))
 
 (defrule evaluate-breeze-none
   (task think) 
@@ -282,14 +297,29 @@
   (printout t "There's no breeze in (" ?x "," ?y ") so there's no pit in (" ?x2  "," ?y2 ")." crlf)
   (modify ?f (has-pit FALSE)))
 
+(defquery query-neighbors-that-possibly-or-for-sure-hold-pit
+	"returns an iterator of neighboring caves of cave x,y that possibly or for sure hold a pit"
+	(declare (variables ?a ?b))
+	(adj ?a ?b ?a2 ?b2)
+	(cave (x ?a2)(y ?b2)(has-pit ~FALSE)))
+
 (defrule evaluate-breeze
-  (task think) 
-  (cave (x ?x)(y ?y)(breeze TRUE))
-  ?f <- (cave (x ?x2)(y ?y2)(has-pit UNKNOWN))
-  (adj ?x ?y ?x2 ?y2)
-  =>
-  (printout t "A breeze in (" ?x "," ?y "), so there may be a pit in (" ?x2  "," ?y2 ")." crlf)
-  (modify ?f (has-pit MAYBE)))
+	(task think) 
+	(cave (x ?x)(y ?y)(breeze TRUE))
+	?f <- (cave (x ?x2)(y ?y2)(has-pit ~FALSE))
+	(adj ?x ?y ?x2 ?y2)
+	=>
+	;check amount of neighbors of x,y that can hold a pit
+	;it it's one only, he has the pit for sure
+	;can also be done when agent is not on x,y, therefore use UNKOWN or MAYBE
+	(if (= 1 (count-query-results query-neighbors-that-possibly-or-for-sure-hold-pit ?x ?y)) then
+		(printout t "#With breeze in (" ?x "," ?y "), the pit is in (" ?x2  "," ?y2 ") for sure." crlf)
+		(modify ?f (has-pit TRUE)(safe FALSE))
+	else
+		;only mark field as "maybe pit" if its pit status is currently unknown
+		(if (= UNKNOWN (fact-slot-value ?f has-pit)) then
+			(printout t "#With breeze in (" ?x "," ?y "), maybe the pit is in (" ?x2  "," ?y2 ")." crlf)
+			(modify ?f (has-pit MAYBE)))))
 
 (defrule evaluate-glitter-none 
   (task think) 
