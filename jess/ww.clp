@@ -15,6 +15,14 @@
   (slot alive (default TRUE))
   (slot arrows (type INTEGER)))
 
+(deftemplate route
+  "Routes between caves"
+  (slot fromx (type INTEGER))
+  (slot fromy (type INTEGER))
+  (slot tox (type INTEGER))
+  (slot toy (type INTEGER))
+  (slot distance (type INTEGER)))
+
 (deftemplate desire "a hunter's desires"
   (slot agent)
   (slot strength (type INTEGER))
@@ -378,6 +386,28 @@
   (printout t "With a dead wumpus and no pit, (" ?x "," ?y ") is safe." crlf)
   (modify ?f (safe TRUE)))
 
+(defrule add-routes
+  "Add routes to neighbors"
+  (task think) 
+  (hunter (agent ?agent) (x ?x)(y ?y))
+  (adj ?x ?y ?x2 ?y2)
+  (not (route (fromx ?x) (fromy ?y)(tox ?x2)(toy ?y2)))
+  => 
+;  (printout t "[3] Route added ("?x"," ?y") -> (" ?x2 "," ?y2 ")" crlf) 
+  (assert (route (fromx ?x)(fromy ?y) (tox ?x2) (toy ?y2) (distance 1))))
+
+(defrule add-routes-based-on-existing
+  "Add routes which are based on the existing routes to current cave"
+  (task think) 
+  (hunter (agent ?agent) (x ?x)(y ?y))
+  (adj ?x ?y ?x2 ?y2)
+  (route (fromx ?fx) (fromy ?fy) (tox ?x) (toy ?y) (distance ?d))
+  (not (route (fromx ?fx) (fromy ?fy) (tox ?x2) (toy ?y2)))
+  (test (not (and (eq ?fx ?x2) (eq ?fy ?y2))))
+  => 
+;  (printout t "[3] Route added ("?fx"," ?fy") -> (" ?x2 "," ?y2 ") with distance=" (+ ?d 1)" based on other routes" crlf) 
+  (assert (route (fromx ?fx)(fromy ?fy) (tox ?x2) (toy ?y2) (distance (+ ?d 1)))))
+
 ;; setting desires ...
 (defrule desire-to-leave-caves 
   (task think)
@@ -518,20 +548,6 @@
   (modify ?hunter (x ?x)(y ?y))
   (if (not ?v) then (modify ?target (fromx ?x2)(fromy ?y2))))
 
-(defrule move-toward-distant-cave
-  "The hunter is in X1Y1 and intends to go to distant X3Y3.  Hunter
-  goes to adjacent safe cave X2Y2 which is closer to X3Y3."
-  (task act)
-  ?hunter <-(hunter (agent ?agent) (x ?x1)(y ?y1))
-  (goal (action go) (x ?x3)(y ?y3))
-  (not (adj ?x1 ?y1 ?x3 ?y3))
-  (cave (x ?x2)(y ?y2)(safe TRUE))
-  (adj ?x1 ?y1 ?x2 ?y2)
-  (test (between ?x1 ?y1 ?x2 ?y2 ?x3 ?y3))
-  =>
-  (printout t ?agent " goes to (" ?x2 "," ?y2 ") trying to get to (" ?x3 "," ?y3 ")." crlf)
-  (modify ?hunter (x ?x2)(y ?y2)))
-
 (defrule delete-desires
   "retracts any desire facts in the database" 
   (task act)
@@ -581,6 +597,33 @@
     (modify ?hunter (arrows (- ?arrows 1)))
 	(modify ?cave (has-wumpus DEAD))
 	(modify ?wumpus (alive FALSE)))
+
+(defrule move-toward-distant-cave-route-exists
+  "Move toward distant cave if route to the target cave exists"
+  (task act)
+  ?hunter <-(hunter (agent ?agent) (x ?x1)(y ?y1))
+  (goal (action go) (x ?x2)(y ?y2))
+  (not (adj ?x1 ?y1 ?x2 ?y2))
+  (route (fromx ?x1) (fromy ?y1) (tox ?x2) (toy ?y2) (distance ?d1))
+  (adj ?x1 ?y1 ?x3 ?y3)
+  (route (fromx ?x3) (fromy ?y3) (tox ?x2) (toy ?y2) (distance ?d2))
+  (test (< ?d2 ?d1))
+  =>
+  (printout t "[3] " ?agent " goes to (" ?x3 "," ?y3 ") trying to get to (" ?x2 "," ?y2 ")." crlf)
+  (modify ?hunter (x ?x3)(y ?y3)))
+
+(defrule move-toward-distant-cave-no-route
+  "Move back toward exit if no route to the target cave exists"
+  (task act)
+  ?hunter <-(hunter (agent ?agent) (x ?x1)(y ?y1))
+  (goal (action go) (x ?x3)(y ?y3))
+  (not (adj ?x1 ?y1 ?x3 ?y3))
+  (not (route (fromx ?x1) (fromy ?y1) (tox ?x3) (toy ?y3)))
+  (cave (x ?x1)(y ?y1) (fromx ?x2) (fromy ?y2))
+  (adj ?x1 ?y1 ?x2 ?y2)
+  =>
+  (printout t "[3] " ?agent " goes to (" ?x2 "," ?y2 ") trying to get to (" ?x3 "," ?y3 ")." crlf)
+  (modify ?hunter (x ?x2)(y ?y2)))
 
 ;; TASK SWITCHING rules -------------------------------------------------------
 ;; These rules cycle us through the various tasks.  Note that they all
