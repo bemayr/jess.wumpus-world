@@ -324,6 +324,39 @@
   (printout t "(" ?x "," ?y ") is safe, so there's no pit or wumpus in it." crlf)
   (modify ?f (has-wumpus FALSE)(has-pit FALSE)))
 
+;; --- custom rules ---
+(defquery query-neighbors-that-possibly-or-for-sure-hold-wumpus
+	"returns an iterator of neighboring caves of cave x,y that possibly or for sure hold a wumpus"
+	(declare (variables ?a ?b))
+	(adj ?a ?b ?a2 ?b2)
+	(cave (x ?a2)(y ?b2)(has-wumpus ~FALSE)))
+
+(defrule evaluate-stench-wumpus-sure
+	(task think) 
+	(cave (x ?x)(y ?y)(stench TRUE))
+	(adj ?x ?y ?x2 ?y2)
+	?f <- (cave (x ?x2)(y ?y2)(has-wumpus ~FALSE))
+    (test (= 1 (count-query-results query-neighbors-that-possibly-or-for-sure-hold-wumpus ?x ?y)))
+	=>
+    (printout t "#With stench in (" ?x "," ?y "), the wumpus is in (" ?x2  "," ?y2 ") for sure." crlf)
+	(modify ?f (has-wumpus TRUE)(safe FALSE)))
+
+(defquery query-neighbors-that-possibly-or-for-sure-hold-pit
+	"returns an iterator of neighboring caves of cave x,y that possibly or for sure hold a pit"
+	(declare (variables ?a ?b))
+	(adj ?a ?b ?a2 ?b2)
+	(cave (x ?a2)(y ?b2)(has-pit ~FALSE)))
+
+(defrule evaluate-breeze-pit-sure
+	(task think) 
+	(cave (x ?x)(y ?y)(breeze TRUE))
+	?f <- (cave (x ?x2)(y ?y2)(has-pit ~FALSE))
+	(adj ?x ?y ?x2 ?y2)
+	(test (= 1 (count-query-results query-neighbors-that-possibly-or-for-sure-hold-pit ?x ?y)))
+	=>
+	(printout t "#With breeze in (" ?x "," ?y "), the pit is in (" ?x2  "," ?y2 ") for sure." crlf)
+	(modify ?f (has-pit TRUE)(safe FALSE)))
+
 ;; setting desires ...
 (defrule desire-to-leave-caves 
   (task think)
