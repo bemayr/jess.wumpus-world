@@ -13,8 +13,7 @@
   (slot y (type INTEGER))
   (slot gold (default 0)(type INTEGER))
   (slot alive (default TRUE))
-  (slot arrows (type INTEGER)(default 1))
-  (slot killed-wumpi (type INTEGER)(default 0)))
+  (slot arrows (type INTEGER)))
 
 (deftemplate desire "a hunter's desires"
   (slot agent)
@@ -125,6 +124,11 @@
   =>
   (buildworld ?width ?height))
 
+; THIS IS TOO GOOD
+;(defquery count-wumpi
+;  "count wumpi"
+;  (wumpus))
+
 (defrule put-hunter-in-caves
   "Assuming the hunter has no (X,Y) in the caves, find an exit
    and put him there."
@@ -134,6 +138,7 @@
   =>
   (printout t ?a " enters the caves at (" ?x "," ?y ")." crlf)
   (modify ?hunter (x ?x)(y ?y)))
+;  (modify ?hunter (x ?x)(y ?y)(arrows (count-query-results count-wumpi))))
 
 ;; SIMULATE rules --------------------------------------------------------------
 (defrule meet-the-wumpus
@@ -376,7 +381,7 @@
 ;; setting desires ...
 (defrule desire-to-leave-caves 
   (task think)
-  (hunter (agent ?a)(x ?x)(y ?y)(gold ~0)(killed-wumpi ~0))
+  (hunter (agent ?a)(x ?x)(y ?y)(gold ~0)(arrows 0))
   (cave (x ?x)(y ?y)(has-exit TRUE))
   => 
   (printout t "Having found the gold, " ?a " wants to leave the caves." crlf)
@@ -384,7 +389,7 @@
 
 (defrule add-desire-to-head-for-the-exit
   (task think) 
-  (hunter (agent ?agent) (x ?x)(y ?y)(gold ~0)(killed-wumpi ~0))
+  (hunter (agent ?agent) (x ?x)(y ?y)(gold ~0)(arrows 0))
   (cave (x ?x)(y ?y)(fromx ?fx)(fromy ?fy))
   (test (> ?fx 0))
   =>  
@@ -566,14 +571,14 @@
 	"if there is a cave x,y with an wumpus on it an a adjacent cave x2,y2 with the hunter on it, the hunter kills the wumpus"
 	(task act)
 	?goal <- (goal (action shoot))
-    ?hunter <- (hunter (agent ?agent) (x ?x)(y ?y) (arrows ?arrows)(killed-wumpi ?killed-wumpi))
+    ?hunter <- (hunter (agent ?agent) (x ?x)(y ?y) (arrows ?arrows))
     ?cave <- (cave (x ?x2)(y ?y2)(has-wumpus TRUE))
     ?wumpus <- (wumpus (alive TRUE))
     (test (> ?arrows 0))
     =>
     (printout t "[2] Hunter at (" ?x "," ?y ") kills wumpus at (" ?x2 "," ?y2 ")." crlf)
     (retract ?goal)
-    (modify ?hunter (arrows (- ?arrows 1))(killed-wumpi (+ ?killed-wumpi 1)))
+    (modify ?hunter (arrows (- ?arrows 1)))
 	(modify ?cave (has-wumpus DEAD))
 	(modify ?wumpus (alive FALSE)))
 

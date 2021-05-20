@@ -5,7 +5,7 @@
   (wumpus (x 4)(y 3))
   (exit (x 1)(y 1))
   (worldsize 4 4)
-  (hunter (agent Orion)))
+  (hunter (agent Orion)(arrows 1)))
 ;;(watch all)
 (reset)
 (run)
