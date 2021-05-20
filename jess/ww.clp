@@ -432,7 +432,6 @@
  (printout t ?agent " somewhat wants to go to (" ?x2 "," ?y2 ")." crlf)
  (assert (desire (agent ?agent) (strength ?*verylow*) (action go)(x ?x2)(y  ?y2))))
 
-
 ;; PLAN rules  --------------------------------------------------------------
 ;; Planning our action is just simply picking the desire to realize
 ;; and asserting an appropriate goal.
