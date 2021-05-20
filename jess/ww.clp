@@ -67,13 +67,6 @@
   (slot x)
   (slot y))
 
-;(deftemplate adj
-;  "Adjacent"
-;  (slot x1 (type INTEGER))
-;  (slot y1 (type INTEGER))
-;  (slot x2 (type INTEGER))
-;  (slot y2 (type INTEGER)))
-
 ;; functions =================================================================
 (deffunction buildworld (?width ?height)
   ;; (buildworld N M) makes cave assertions for a NxM rectangular  world.
@@ -265,7 +258,7 @@
   (modify ?f (has-wumpus FALSE)))
 
 (defrule evaluate-stench
-  (task think)
+  (task think) 
   (cave (x ?x)(y ?y)(stench TRUE))
   (adj ?x ?y ?x2 ?y2)
   ?f <- (cave (x ?x2)(y ?y2)(has-wumpus UNKNOWN))
@@ -338,7 +331,7 @@
 	(adj ?a ?b ?a2 ?b2)
 	(cave (x ?a2)(y ?b2)(has-wumpus ~FALSE)))
 
-(defrule evaluate-stench-wumpus-true
+(defrule evaluate-stench-wumpus-sure
 	(task think) 
 	(cave (x ?x)(y ?y)(stench TRUE))
 	(adj ?x ?y ?x2 ?y2)
@@ -348,14 +341,13 @@
     (printout t "#With stench in (" ?x "," ?y "), the wumpus is in (" ?x2  "," ?y2 ") for sure." crlf)
 	(modify ?f (has-wumpus TRUE)(safe FALSE)))
 
-
 (defquery query-neighbors-that-possibly-or-for-sure-hold-pit
 	"returns an iterator of neighboring caves of cave x,y that possibly or for sure hold a pit"
 	(declare (variables ?a ?b))
 	(adj ?a ?b ?a2 ?b2)
 	(cave (x ?a2)(y ?b2)(has-pit ~FALSE)))
 
-(defrule evaluate-breeze
+(defrule evaluate-breeze-pit-sure
 	(task think) 
 	(cave (x ?x)(y ?y)(breeze TRUE))
 	?f <- (cave (x ?x2)(y ?y2)(has-pit ~FALSE))
