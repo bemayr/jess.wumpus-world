@@ -5,7 +5,7 @@
   (pit (x 2)(y 4))
   (wumpus (x 4)(y 4))
   (exit (x 1)(y 1))
-  (hunter (agent Actaeon)))
+  (hunter (agent Actaeon)(arrows 1)))
 ;;(watch all)
 (reset)
 (run)

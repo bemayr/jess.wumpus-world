@@ -12,7 +12,8 @@
   (slot x (type INTEGER))
   (slot y (type INTEGER))
   (slot gold (default 0)(type INTEGER))
-  (slot alive (default TRUE)))
+  (slot alive (default TRUE))
+  (slot arrows (type INTEGER)))
 
 (deftemplate desire "a hunter's desires"
   (slot agent)
@@ -123,6 +124,11 @@
   =>
   (buildworld ?width ?height))
 
+; THIS IS TOO GOOD
+;(defquery count-wumpi
+;  "count wumpi"
+;  (wumpus))
+
 (defrule put-hunter-in-caves
   "Assuming the hunter has no (X,Y) in the caves, find an exit
    and put him there."
@@ -132,6 +138,7 @@
   =>
   (printout t ?a " enters the caves at (" ?x "," ?y ")." crlf)
   (modify ?hunter (x ?x)(y ?y)))
+;  (modify ?hunter (x ?x)(y ?y)(arrows (count-query-results count-wumpi))))
 
 ;; SIMULATE rules --------------------------------------------------------------
 (defrule meet-the-wumpus
@@ -211,7 +218,7 @@
   (hunter (agent ?agent) (x ?x) (y ?y))
   ?cave <- (cave (x ?x)(y ?y)(stench UNKNOWN))
   (adj ?x ?y ?x2 ?y2)
-  (wumpus (x ?x2) (y ?y2) (alive TRUE))
+  (wumpus (x ?x2) (y ?y2))
    =>
   (printout t ?agent " smells a stench in (" ?x "," ?y ")." crlf) 
   (modify ?cave (stench TRUE)))
@@ -320,47 +327,61 @@
   (task think) 
   (or ?f <- (cave (x ?x)(y ?y)(safe TRUE)(has-wumpus ~FALSE))
       ?f <- (cave (x ?x)(y ?y)(safe TRUE)(has-pit ~FALSE)))
+  (not (cave (x ?x)(y ?y)(has-wumpus DEAD)))
   =>
   (printout t "(" ?x "," ?y ") is safe, so there's no pit or wumpus in it." crlf)
   (modify ?f (has-wumpus FALSE)(has-pit FALSE)))
 
 ;; --- custom rules ---
-(defquery query-neighbors-that-possibly-or-for-sure-hold-wumpus
+(defquery query-neighbors-that-possibly-hold-or-for-sure-wumpus
 	"returns an iterator of neighboring caves of cave x,y that possibly or for sure hold a wumpus"
 	(declare (variables ?a ?b))
 	(adj ?a ?b ?a2 ?b2)
-	(cave (x ?a2)(y ?b2)(has-wumpus ~FALSE)))
+	(or (cave (x ?a2)(y ?b2)(has-wumpus TRUE))
+        (cave (x ?a2)(y ?b2)(has-wumpus DEAD))
+        (cave (x ?a2)(y ?b2)(has-wumpus MAYBE))
+	    (cave (x ?a2)(y ?b2)(has-wumpus UNKNOWN))))
 
 (defrule evaluate-stench-wumpus-sure
 	(task think) 
 	(cave (x ?x)(y ?y)(stench TRUE))
 	(adj ?x ?y ?x2 ?y2)
-	?f <- (cave (x ?x2)(y ?y2)(has-wumpus ~FALSE))
-    (test (= 1 (count-query-results query-neighbors-that-possibly-or-for-sure-hold-wumpus ?x ?y)))
+	?f <- (cave (x ?x2)(y ?y2)(has-wumpus MAYBE))
+    (test (= 1 (count-query-results query-neighbors-that-possibly-hold-or-for-sure-wumpus ?x ?y)))
 	=>
-    (printout t "#With stench in (" ?x "," ?y "), the wumpus is in (" ?x2  "," ?y2 ") for sure." crlf)
+    (printout t "[1] With a stench in (" ?x "," ?y "), the wumpus is in (" ?x2  "," ?y2 ") for sure." crlf)
 	(modify ?f (has-wumpus TRUE)(safe FALSE)))
 
-(defquery query-neighbors-that-possibly-or-for-sure-hold-pit
-	"returns an iterator of neighboring caves of cave x,y that possibly or for sure hold a pit"
+(defquery query-neighbors-that-possibly-hold-or-for-sure-pit
+	"returns an iterator of neighboring caves of cave x,y that possibly hold a pit"
 	(declare (variables ?a ?b))
 	(adj ?a ?b ?a2 ?b2)
-	(cave (x ?a2)(y ?b2)(has-pit ~FALSE)))
+    (or (cave (x ?a2)(y ?b2)(has-pit TRUE))
+        (cave (x ?a2)(y ?b2)(has-pit MAYBE))
+	    (cave (x ?a2)(y ?b2)(has-pit UNKNOWN))))
 
 (defrule evaluate-breeze-pit-sure
 	(task think) 
 	(cave (x ?x)(y ?y)(breeze TRUE))
-	?f <- (cave (x ?x2)(y ?y2)(has-pit ~FALSE))
 	(adj ?x ?y ?x2 ?y2)
-	(test (= 1 (count-query-results query-neighbors-that-possibly-or-for-sure-hold-pit ?x ?y)))
+	?f <- (cave (x ?x2)(y ?y2)(has-pit MAYBE))
+	(test (= 1 (count-query-results query-neighbors-that-possibly-hold-or-for-sure-pit ?x ?y)))
 	=>
-	(printout t "#With breeze in (" ?x "," ?y "), the pit is in (" ?x2  "," ?y2 ") for sure." crlf)
+	(printout t "[1] With a breeze in (" ?x "," ?y "), the pit is in (" ?x2  "," ?y2 ") for sure." crlf)
 	(modify ?f (has-pit TRUE)(safe FALSE)))
+
+(defrule safe-cave4
+  (task think) 
+  ?f <- (cave (x ?x)(y ?y) (has-wumpus DEAD)(has-pit FALSE))
+  (wumpus (x ?x)(y ?y))
+  =>
+  (printout t "With a dead wumpus and no pit, (" ?x "," ?y ") is safe." crlf)
+  (modify ?f (safe TRUE)))
 
 ;; setting desires ...
 (defrule desire-to-leave-caves 
   (task think)
-  (hunter (agent ?a)(x ?x)(y ?y)(gold ~0))
+  (hunter (agent ?a)(x ?x)(y ?y)(gold ~0)(arrows 0))
   (cave (x ?x)(y ?y)(has-exit TRUE))
   => 
   (printout t "Having found the gold, " ?a " wants to leave the caves." crlf)
@@ -368,7 +389,7 @@
 
 (defrule add-desire-to-head-for-the-exit
   (task think) 
-  (hunter (agent ?agent) (x ?x)(y ?y)(gold ~0))
+  (hunter (agent ?agent) (x ?x)(y ?y)(gold ~0)(arrows 0))
   (cave (x ?x)(y ?y)(fromx ?fx)(fromy ?fy))
   (test (> ?fx 0))
   =>  
@@ -431,6 +452,17 @@
  => 
  (printout t ?agent " somewhat wants to go to (" ?x2 "," ?y2 ")." crlf)
  (assert (desire (agent ?agent) (strength ?*verylow*) (action go)(x ?x2)(y  ?y2))))
+
+;; --- custom rules ---
+(defrule lust-for-kill
+  "if the hunter is next to a field where a wumpus lives, she wants to kill"
+  (task think)
+  (cave (x ?x)(y ?y)(has-wumpus TRUE))
+  (hunter (agent ?a)(x ?x2)(y ?y2))
+  (adj ?x ?y ?x2 ?y2)
+  =>
+  (printout t "[2] " ?a " wants to shoot the wumpus in (" ?x "," ?y ")." crlf)
+  (assert (desire (agent ?a)(strength ?*veryhigh*)(action shoot))))
 
 ;; PLAN rules  --------------------------------------------------------------
 ;; Planning our action is just simply picking the desire to realize
@@ -533,6 +565,22 @@
   =>
   (printout t "WARNING: unsatisfied goal: " ?act " " ?x " " ?y "."  crlf)
   (halt))
+
+;; --- custom rules ---
+(defrule kill-wumpus
+	"if there is a cave x,y with an wumpus on it an a adjacent cave x2,y2 with the hunter on it, the hunter kills the wumpus"
+	(task act)
+	?goal <- (goal (action shoot))
+    ?hunter <- (hunter (agent ?agent) (x ?x)(y ?y) (arrows ?arrows))
+    ?cave <- (cave (x ?x2)(y ?y2)(has-wumpus TRUE))
+    ?wumpus <- (wumpus (alive TRUE))
+    (test (> ?arrows 0))
+    =>
+    (printout t "[2] Hunter at (" ?x "," ?y ") kills wumpus at (" ?x2 "," ?y2 ")." crlf)
+    (retract ?goal)
+    (modify ?hunter (arrows (- ?arrows 1)))
+	(modify ?cave (has-wumpus DEAD))
+	(modify ?wumpus (alive FALSE)))
 
 ;; TASK SWITCHING rules -------------------------------------------------------
 ;; These rules cycle us through the various tasks.  Note that they all

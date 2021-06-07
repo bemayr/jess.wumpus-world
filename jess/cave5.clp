@@ -6,7 +6,7 @@
   (pit (x 3)(y 3))
   (gold (x 4)(y 2)(amount 100))
   (exit (x 1)(y 1))
-  (hunter (agent Erik)))
+  (hunter (agent Erik)(arrows 0)))
 ;;(watch all)
 (reset)
 (run)
